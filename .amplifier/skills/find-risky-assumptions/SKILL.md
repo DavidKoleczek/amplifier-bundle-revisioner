@@ -182,6 +182,22 @@ past-visions section). If Python or the script is unavailable, edit the YAML by 
 following the exact shape above — but then you must generate unique base62 ids yourself
 and take care not to disturb existing entries.
 
+### Step 6b — Stamp the vision fingerprint
+
+The ledger's assumptions are bets *this* version of the vision makes. Record a hash of
+the vision into the ledger so a later check-in can detect that the vision has since
+changed and the ledger is stale:
+
+```bash
+python3 .amplifier/skills/vision-check-in/scripts/stamp_vision.py \
+  --file ./.amplifier/revisioner/risky-assumptions.yaml \
+  --vision ./.amplifier/revisioner/vision.md
+```
+
+Always run this after any write in Step 6 (and it's harmless to re-run when nothing was
+added). Without it, `vision-check-in` cannot tell a fresh ledger from one built against
+a since-edited vision.
+
 ### Step 7 — Report
 
 Tell the user, briefly: how many new assumptions were added (with their ids and risk),

@@ -3,12 +3,45 @@
 The three check-in conversations, in detail. The classifier (`scripts/classify.py`)
 names the recommended mode; this is how to run each one. A real ledger often contains
 ingredients of more than one — always lead with the highest priority
-(**pivot > unblock > in_progress > all-clear**), but you may fold in the others as a
-brief tail ("...and separately, two spikes are still running").
+(**stale > pivot > unblock > in_progress > all-clear**), but you may fold in the others
+as a brief tail ("...and separately, two spikes are still running"). **stale** is the one
+exception: it does not fold — a drifted vision halts the check-in until the ledger is
+rebuilt.
 
 Throughout: **you read state and steer.** You never set `risk` or `confidence` yourself.
 Confidence moves only through `derisk-assumptions`; risk only through
 `find-risky-assumptions`.
+
+---
+
+## Mode: stale (vision drifted — halt)
+
+**Fires when** the classifier reports `vision_drift.stale: true`: the `sha256` of
+`vision.md` no longer matches the fingerprint stamped into the ledger. The vision was
+edited (an approved pivot, or an out-of-band change) after this ledger was built.
+
+**Goal:** stop, rebuild the ledger against the current vision, do not reason on stale bets.
+
+1. **Do not** walk the buckets, propose a pivot, or ask for unblock input. Every bet in
+   the ledger describes a *prior* vision and may not even be made by the current one.
+2. Tell the user plainly the vision drifted since the assumptions were captured, and that
+   a check-in is meaningless until the ledger is rebuilt.
+3. Re-run `find-risky-assumptions` on the current vision — it surfaces the new bets and
+   **re-stamps** the fingerprint (Step 6b), which clears the stale flag:
+
+   ```
+   load_skill(skill_name="find-risky-assumptions")   # rebuild + re-stamp
+   ```
+
+4. Snapshot again. Whatever mode the rebuilt ledger lands in is the real conversation.
+
+Note the self-healing loop: an approved **pivot** already ends by editing `vision.md` and
+re-running the pipeline, so it re-stamps on its own. **stale** is what catches a vision
+edited *outside* that flow — the safety net, not the normal path.
+
+> `vision.md` changed since these 7 assumptions were captured (stored 151788… vs current
+> 0e648d…). The ledger is stale — I won't read a check-in off it. Let me re-run
+> find-risky-assumptions on the current vision to rebuild the bets, then I'll snapshot again.
 
 ---
 

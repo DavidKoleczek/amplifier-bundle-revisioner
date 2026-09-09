@@ -53,6 +53,51 @@ PAST_KEY = "assumptions_related_to_past_visions"
 
 CAT_ORDER = ["fails", "blocked", "in_flight", "open", "holds"]
 
+META_KEY = "revisioner_meta"
+
+
+def stored_vision_hash(path: Path) -> str | None:
+    """Read the vision fingerprint stamped into the ledger, or None if unstamped."""
+    try:
+        data = yaml.safe_load(path.read_text()) or []
+    except (OSError, yaml.YAMLError):
+        return None
+    if not isinstance(data, list):
+        return None
+    for item in data:
+        if isinstance(item, dict) and META_KEY in item:
+            block = item[META_KEY]
+            if isinstance(block, dict) and block.get("vision_sha256"):
+                return str(block["vision_sha256"])
+    return None
+
+
+def current_vision_hash(vision_path: Path) -> str | None:
+    """Byte-exact sha256 of the current vision file, or None if it is absent."""
+    if not vision_path.exists():
+        return None
+    import hashlib
+
+    return hashlib.sha256(vision_path.read_bytes()).hexdigest()
+
+
+def check_drift(ledger: Path, vision_path: Path) -> dict[str, Any]:
+    """Compare the vision the ledger was built from against the vision on disk now.
+
+    Only a positive mismatch (both hashes known and different) is 'stale'. An unstamped
+    ledger or a missing vision file yields checked=False -- no false alarm, no signal.
+    """
+    stored = stored_vision_hash(ledger)
+    current = current_vision_hash(vision_path)
+    checked = stored is not None and current is not None
+    return {
+        "checked": checked,
+        "stale": checked and stored != current,
+        "stored": stored,
+        "current": current,
+        "vision_path": str(vision_path),
+    }
+
 
 def load_sections(path: Path) -> dict[str, list]:
     """Return {section_key: [entries]} for the top-level list-of-sections ledger."""
@@ -123,6 +168,7 @@ def classify(
     hold: float,
     fail: float,
     high_risk: float,
+    drift: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for entry in sections.get(CURRENT_KEY, []):
@@ -164,7 +210,12 @@ def classify(
     high_hold = [r for r in high if r["category"] == "holds"]
     running_or_open = [r for r in rows if r["category"] in ("in_flight", "open")]
 
-    if high_fail:
+    drift = drift or {"checked": False, "stale": False}
+    if drift.get("stale"):
+        # The vision changed since this ledger was built: every bet below is suspect,
+        # so drift outranks even a realized risk. Don't reason about stale assumptions.
+        mode = "stale"
+    elif high_fail:
         mode = "pivot"
     elif high_blocked:
         mode = "unblock"
@@ -178,6 +229,7 @@ def classify(
         "counts": {cat: len(bucket(cat)) for cat in CAT_ORDER},
         "high_risk_total": len(high),
         "high_risk_holding": len(high_hold),
+        "vision_drift": drift,
         "buckets": {cat: bucket(cat) for cat in CAT_ORDER},
         "rows": rows,
     }
@@ -188,6 +240,18 @@ def render_human(result: dict[str, Any]) -> str:
     mode = result["recommended_mode"]
     c = result["counts"]
     lines.append(f"Recommended check-in mode: {mode.upper()}")
+    drift = result.get("vision_drift") or {}
+    if drift.get("stale"):
+        lines.append(
+            "  !! VISION DRIFT: vision.md changed since this ledger was built "
+            "-- assumptions below are STALE."
+        )
+        lines.append(
+            f"     stored={str(drift.get('stored'))[:12]}... current={str(drift.get('current'))[:12]}..."
+        )
+        lines.append(
+            "     Re-run find-risky-assumptions on the current vision before trusting a check-in."
+        )
     lines.append(
         f"  high-risk assumptions: {result['high_risk_holding']}/{result['high_risk_total']} holding"
     )
@@ -235,12 +299,28 @@ def main() -> int:
     parser.add_argument("--fail-threshold", type=float, default=0.7)
     parser.add_argument("--high-risk-threshold", type=float, default=0.7)
     parser.add_argument(
+        "--vision",
+        default=None,
+        help="Path to vision.md for drift detection (default: <ledger dir>/vision.md)",
+    )
+    parser.add_argument(
+        "--no-drift-check",
+        action="store_true",
+        help="Skip the vision-drift check entirely.",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Emit machine-readable JSON"
     )
     args = parser.parse_args()
 
     path = Path(args.file)
     data_dir = Path(args.data_dir) if args.data_dir else path.parent / "data"
+    vision_path = Path(args.vision) if args.vision else path.parent / "vision.md"
+    drift = (
+        {"checked": False, "stale": False}
+        if args.no_drift_check
+        else check_drift(path, vision_path)
+    )
     sections = load_sections(path)
     result = classify(
         sections,
@@ -248,6 +328,7 @@ def main() -> int:
         args.hold_threshold,
         args.fail_threshold,
         args.high_risk_threshold,
+        drift,
     )
 
     if args.json:

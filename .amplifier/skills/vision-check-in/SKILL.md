@@ -25,11 +25,12 @@ report what is settled, name what is still running, and act on what needs a huma
 
 ## What a check-in decides
 
-Run the classifier, then have exactly one of three conversations (a real ledger often
-has ingredients of all three — lead with the highest-priority one):
+Run the classifier, then have exactly one of these conversations (a real ledger often
+has ingredients of several — lead with the highest-priority one):
 
 | Mode | Fires when | You do |
 |---|---|---|
+| **stale** | `vision.md` changed since the ledger was built | Stop: the whole ledger is suspect. Re-run `find-risky-assumptions` on the current vision before trusting any bet. |
 | **all-clear** | every high-risk assumption **holds** | Report success: the load-bearing bets are de-risked. Done. |
 | **unblock** | a high-risk assumption is **blocked** | Ask the user for exactly the `needs:` items — or propose an alternative spike — then **resume de-risking** on those ids. |
 | **pivot** | a high-risk assumption **fails** (risk realized) | Propose how the vision could change, as a **diff for approval**; on OK, archive the stale bets and **re-run find + derisk** on the new vision. |
@@ -37,8 +38,16 @@ has ingredients of all three — lead with the highest-priority one):
 When nothing needs a human yet — spikes still running, or open assumptions not spiked —
 the mode is **in_progress**: report progress and offer to launch/continue de-risking.
 
-Priority when several apply: **pivot > unblock > (in_progress) > all-clear**. A realized
-risk on a load-bearing bet is the most consequential thing on the board; surface it first.
+Priority when several apply: **stale > pivot > unblock > (in_progress) > all-clear**. A
+changed vision outranks everything — there is no point reasoning about a realized risk on
+a bet the current vision may no longer even make. After that, a realized risk on a
+load-bearing bet is the most consequential thing on the board; surface it first.
+
+**How stale is detected.** At generation time `find-risky-assumptions` stamps the ledger
+with a `sha256` of `vision.md` (via `stamp_vision.py`). On every check-in the classifier
+re-hashes the current `vision.md` and compares. Mismatch → **stale**. An *unstamped*
+ledger or a missing vision file raises no alarm (`checked: false`) — drift is only ever
+flagged on a positive mismatch, never guessed.
 
 ## The axes (this skill reads, never writes)
 
@@ -88,6 +97,12 @@ blocked, and any realized risks. Read `data/<id>/findings.md` for the headline o
 anything that flipped. Then move to the conversation for the recommended mode.
 
 ### Step 3 — Drive the conversation (see `references/interaction-playbook.md`)
+
+**stale.** The classifier reports `vision_drift.stale: true` — `vision.md` has changed
+since this ledger was built, so every bet below may no longer describe the current
+vision. Do not walk the buckets or propose a pivot. Tell the user the vision drifted,
+then re-run `find-risky-assumptions` on the current vision (it re-stamps the ledger) and
+snapshot again. Everything else waits on that.
 
 **all-clear.** State plainly that every load-bearing assumption now holds, cite the
 confidence + evidence pointer for each, and note any low-risk residuals the user may
