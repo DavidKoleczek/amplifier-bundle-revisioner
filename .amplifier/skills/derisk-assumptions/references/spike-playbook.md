@@ -25,19 +25,39 @@ For the assumption, write down (into `data/<id>/spike-plan.md`):
 
 ---
 
-## 2. Pick the spike type that fits the claim
+## 2. The evidence hierarchy — observe reality, don't collect opinions
 
-Most assumptions map to one of three. Combine them when useful.
+Derisking earns confidence from **first-hand contact with reality**, not from what
+sources *say* about reality. Grade every piece of evidence before it moves a number:
 
-### a. Evidence search (does someone already know?)
-Best when the claim is common, studied, or governed by policy/docs you can find.
-- Look for empirical results, benchmarks, datasheets, RFCs, standards, vendor limits,
-  postmortems, or authoritative internal policy.
-- Grade sources: primary measurement > reputable secondary > vendor marketing >
-  forum anecdote. Record links/quotes verbatim in `data/<id>/sources.md`.
-- Beware "true in the abstract" answers that dodge the vision's specific conditions.
+| Grade | What it is | Confidence ceiling |
+|---|---|---|
+| **A — Primary, first-hand** | You ran it on real/representative data and measured it; a replicated study whose method+data you inspected; authoritative policy read at its source. | `1.00` |
+| **B — Primary, single/indirect** | One solid first-hand trial; one primary source with a stated, checkable method; a hard vendor limit from the datasheet. | `0.80` |
+| **C — Secondary** | A reputable *summary* of primary work (survey paper, docs citing a study), or thin/single-sample/confounded first-hand data. | `0.50` |
+| **D — Opinion / hearsay** | Blog posts, marketing, analyst/consulting reports, forum anecdotes, LLM say-so, "everyone knows". | `0.20` |
 
-### b. Hands-on trial (just try it)
+**The ceilings are hard.** Grade D and C cannot be stacked into certainty — ten blog
+posts that agree are still grade D. To cross `|0.55|` you need grade A or B evidence you
+obtained yourself. Grade D is a **lead**, never a verdict: its only legitimate use is to
+point you at a primary source you then verify. Record each item's grade in
+`data/<id>/sources.md` (or `findings.md`).
+
+This is why the spike *types* below are ordered strongest-first — pick the highest grade
+you can afford for the claim, and drop to a lower one only with a stated reason.
+
+### a. Fresh empirical investigation (measure it) — reaches grade A
+Best, and the default when the claim is quantitative or unpublished at the vision's
+conditions.
+- Generate or download representative data; run the model/benchmark/simulation;
+  measure against the kill criterion.
+- Note sample size, method, and confounders honestly. One run on toy data is grade C
+  (*suggestive*, |0.25–0.50|), not proof — real/representative data at the vision's
+  scale is what earns grade A.
+- Keep the dataset, the script, and the raw results in `data/<id>/` so the number is
+  reproducible later.
+
+### b. Hands-on trial (just try it) — reaches grade A/B
 Best when you can cheaply touch the real thing.
 - Run the command, hit the API, check the actual permission/quota/config, wire a
   throwaway prototype, reproduce the workflow end to end on a small scale.
@@ -45,14 +65,13 @@ Best when you can cheaply touch the real thing.
   commands and their raw stdout/stderr into `data/<id>/`.
 - A trial that *fails to even set up* is itself evidence — often the "blocked" signal.
 
-### c. Fresh empirical investigation (measure it)
-Best when nobody's published it and it can't be settled by a quick trial.
-- Generate or download representative data; run the model/benchmark/simulation;
-  measure against the kill criterion.
-- Note sample size, method, and confounders honestly. One run on toy data is
-  *suggestive* (|0.25–0.50|), not proof.
-- Keep the dataset, the script, and the raw results in `data/<id>/` so the number is
-  reproducible later.
+### c. Evidence search (does someone already know?) — grade A only if primary
+Legitimate **only** when it surfaces primary evidence you can inspect: peer-reviewed
+results with data/method, standards, RFCs, datasheets, hard vendor limits.
+- A search that returns summaries, blogs, or reports has produced grade C/D — a lead to
+  chase to its primary source, not a result. Don't score off it.
+- Beware "true in the abstract" answers that dodge the vision's specific conditions.
+- Record links/quotes verbatim and graded in `data/<id>/sources.md`.
 
 ---
 
@@ -84,8 +103,8 @@ Keep everything — this dir is the audit trail and the input to any future re-s
 
 ```
 .amplifier/revisioner/data/<id>/
-  spike-plan.md      # the claim, kill criterion, method, blocked-shape (Step 3)
-  sources.md         # links + verbatim quotes, graded (evidence-search spikes)
+  spike-plan.md      # the claim, kill criterion, method, target grade, blocked-shape (Step 3)
+  sources.md         # links + verbatim quotes, each tagged with its grade (A/B/C/D, §2)
   run/               # scripts, configs, commands actually executed
   output/            # raw stdout/stderr, logs, generated/downloaded data, screenshots
   findings.md        # evidence -> reasoning -> conclusion -> proposed confidence
@@ -93,28 +112,37 @@ Keep everything — this dir is the audit trail and the input to any future re-s
 ```
 
 `findings.md` is the human story; `verdict.json` is what feeds
-`update_confidence.py`. Write both. Never inline large data into the ledger — the
-ledger holds only the number; the *why* lives here.
+`update_confidence.py`. Write both. **`findings.md` must state the evidence grade the
+confidence rests on** (§2) — the number is only auditable if the grade behind it is on
+the record. Never inline large data into the ledger — the ledger holds only the number;
+the *why* lives here.
 
 ---
 
 ## 5. From findings to a signed confidence
 
-Magnitude = strength/directness of evidence; sign = which way it points.
+Magnitude = strength/directness of evidence; sign = which way it points. **Magnitude is
+bounded by the evidence grade from §2** — the grade sets the ceiling, the specifics of
+the spike set where you land under it.
 
-| `|confidence|` | Looks like |
-|---|---|
-| `0.85 – 1.00` | You ran it and watched it happen; authoritative policy states it; strong replicated measurement. |
-| `0.55 – 0.80` | One solid trial or one trustworthy primary source; indirect but credible. |
-| `0.25 – 0.50` | Suggestive — leans one way but thin, single-sample, or confounded. |
-| `0.00 – 0.20` | Inconclusive or (conditionally) unknowable — attach a `derisking:` block. |
+| `|confidence|` | Looks like | Min grade |
+|---|---|---|
+| `0.85 – 1.00` | You ran it on real data and watched it happen; authoritative policy read at source; replicated measurement you inspected. | A |
+| `0.55 – 0.80` | One solid first-hand trial, or one primary source with a checkable method. | B |
+| `0.25 – 0.50` | Suggestive — a reputable secondary summary, or thin/single-sample/confounded first-hand data. | C |
+| `0.00 – 0.20` | Inconclusive, opinion/hearsay only, or (conditionally) unknowable — attach a `derisking:` block. | D |
 
 Sign: evidence the assumption **holds → positive**; evidence it **does not hold →
 negative**. Calibrate against the *vision's* bar, not a generic one.
 
 Honesty rules:
+- **The grade is a hard ceiling.** Grade C/D evidence cannot reach `|0.55|` no matter
+  how much of it agrees — hearsay does not compound into proof. Cross `|0.55|` only on
+  grade A/B evidence you obtained first-hand.
 - Don't round a hunch up to certainty. A quick smoke test is ~`0.6`, not `1.0`.
-- Confounded or narrow evidence caps the magnitude, whichever way it points.
+- Confounded or narrow evidence caps the magnitude further, whichever way it points.
+- If the only support is grade D, the honest score is `≤ |0.20|` with a `derisking:`
+  block naming the primary check that would settle it — not a confident number.
 - **Invalidation is a win.** Negative confidence means you caught a realized risk
   before it cost the project — report it as loudly as a validation.
 

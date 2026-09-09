@@ -72,19 +72,29 @@ re-spike. Confirm the selected set (ids + one-line each) before spending real wo
 
 ### Step 3 — Design a spike per assumption
 
-For each target, design the cheapest spike that yields decisive evidence. Pick the
-kind that fits the claim (see `references/spike-playbook.md` for depth):
+For each target, design the cheapest spike that yields decisive evidence. **Bias to
+first-hand evidence**: the goal is to *observe reality*, not to collect opinions about
+it. Prefer, in order:
 
-- **Evidence search** — find existing empirical results, benchmarks, docs, prior art,
-  or authoritative policy that settle it.
-- **Hands-on trial** — actually try the thing: run the command, hit the API, build a
-  throwaway prototype, check the real permission/quota/config.
-- **Fresh empirical investigation** — generate or download data, run a model or
-  benchmark, measure. Whatever it takes to produce a real observation.
+1. **Fresh empirical investigation** — generate or download real data, run the
+   model/benchmark/simulation, measure against the kill criterion. A real observation.
+2. **Hands-on trial** — actually try the thing: run the command, hit the API, build a
+   throwaway prototype, check the real permission/quota/config. The system's own output.
+3. **Evidence search** — only when the claim is already settled by *primary* empirical
+   work you can inspect: peer-reviewed results, datasheets/benchmarks with a stated
+   method, standards, hard vendor limits. A search spike must surface primary evidence,
+   not summaries **about** evidence.
+
+Reach for a lower rung only when a higher one is genuinely too costly or impossible, and
+say so in the plan. **Blog posts, marketing, analyst/consulting reports, forum
+anecdotes, and LLM say-so are not evidence** — at most they point you toward a primary
+source you must then verify yourself. See the evidence hierarchy in
+`references/spike-playbook.md §2`.
 
 Write each plan to `./.amplifier/revisioner/data/<id>/spike-plan.md` **before**
-running it: the claim, what evidence would confirm vs refute, the method, and what
-"blocked" would look like (what access/tool/data you'd be missing).
+running it: the claim, what evidence would confirm vs refute, the method, the
+**evidence grade you intend to obtain** (see Step 5), and what "blocked" would look
+like (what access/tool/data you'd be missing).
 
 ### Step 4 — Run the spikes in parallel, each isolated
 
@@ -135,17 +145,25 @@ evidence, `blocked` when every `derisking` approach came back `blocked: true`.
 ### Step 5 — Score confidence from the evidence
 
 Convert each spike's findings into a **signed** confidence. Sign = direction the
-evidence points; magnitude = how strong/direct it is:
+evidence points; magnitude = how strong/direct it is. **Magnitude is capped by the
+grade of evidence you actually obtained** — you cannot buy certainty with weak sources:
 
-| `|confidence|` | Evidence quality |
+| `|confidence|` | Evidence grade (the *ceiling* for that grade) |
 |---|---|
-| `0.85 – 1.00` | Direct, decisive proof (you ran it and saw it; authoritative policy; strong replicated results). |
-| `0.55 – 0.80` | Solid but indirect, or a single trustworthy source/trial. |
-| `0.25 – 0.50` | Suggestive — leans one way but thin or confounded. |
-| `0.00 – 0.20` | Inconclusive / (conditionally) unknowable — attach a `derisking:` block. |
+| `0.85 – 1.00` | **Primary, first-hand:** you ran it on real data and measured it; a replicated study you inspected; authoritative policy read at the source. |
+| `0.55 – 0.80` | One solid first-hand trial, or a single primary source with a stated method. |
+| `0.25 – 0.50` | **Ceiling for secondary/indirect** — a reputable summary of primary work, or thin/single-sample/confounded first-hand data. |
+| `0.00 – 0.20` | Inconclusive, or only weak sources exist (blog/marketing/analyst report/forum/LLM say-so), or (conditionally) unknowable — attach a `derisking:` block. |
 
 Then apply the sign: evidence the assumption **holds → positive**; evidence it **does
-not hold → negative**. Do not overstate: a quick trial is not `1.0`.
+not hold → negative**.
+
+**The cap is hard.** Secondary or opinion sources max out at `|0.50|` no matter how
+many agree — hearsay does not compound into proof. To cross `|0.55|` you must have
+touched the primary evidence yourself (measured it, ran it, or read the authoritative
+source). Record the grade in `findings.md`; if the only support is a blog/report/model
+opinion, the honest confidence stays `≤ |0.20|` with a `derisking:` block naming the
+primary check that would settle it. Do not overstate: a quick trial is not `1.0`.
 
 **Conditional unknowability.** If the spike couldn't resolve it, keep confidence near
 `0.0` and record why + the path out. Every unresolved approach names exactly what
@@ -196,6 +214,12 @@ and assumptions still **unknowable** (with the `needs:` to unblock them).
   section structure. Risk is stakes and belongs to the find skill.
 - **Evidence or nothing.** Confidence moves *only* on real evidence a spike produced.
   No guessing a number from intuition; an un-run spike leaves confidence at `0.0`.
+- **Empirical over hearsay.** First-hand observation (you measured it, ran it, or read
+  the authoritative source) beats anyone's *description* of it. Blog posts, marketing,
+  analyst/consulting reports, forum anecdotes, and LLM say-so are leads, not evidence:
+  they can only cap confidence at `|0.50|`, and alone they cap it at `|0.20|`. Crossing
+  `|0.55|` requires primary evidence you touched yourself. Record the grade in
+  `findings.md`.
 - **Keep all the data.** Everything a spike touches lands under
   `.amplifier/revisioner/data/<id>/` so it can be audited and drilled into later.
 - **Isolate every spike.** Separate worktree or temp dir per spike; clean up worktrees
