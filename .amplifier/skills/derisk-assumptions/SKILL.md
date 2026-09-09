@@ -44,6 +44,7 @@ Outcomes stated in confidence terms:
 | Vision (context for what "holds" means) | `./.amplifier/revisioner/vision.md` |
 | Ledger (read + update) | `./.amplifier/revisioner/risky-assumptions.yaml` |
 | Per-assumption data (all spike artifacts) | `./.amplifier/revisioner/data/<id>/` |
+| Per-spike run-state (for the check-in skill) | `./.amplifier/revisioner/data/<id>/status.json` |
 | Confidence writer | `scripts/update_confidence.py` |
 | Spike design + isolation + scoring depth | `references/spike-playbook.md` |
 
@@ -117,6 +118,20 @@ Scale concurrency to the host — batch large sets (a handful at a time) rather 
 launching dozens at once. Each sub-agent owns exactly one id's data dir; they never
 write to the ledger.
 
+**Mark run-state as you go.** Because spikes run concurrently and the **vision-check-in**
+skill reports on live progress, stamp each id's run-state to
+`./.amplifier/revisioner/data/<id>/status.json` — otherwise `confidence: 0.0` is
+ambiguous between *untested*, *running now*, and *blocked*. Write `running` the moment
+a spike launches:
+
+```bash
+printf '{"state":"running","updated":"%s"}\n' "$(date -u +%FT%TZ)" \
+  > ./.amplifier/revisioner/data/<id>/status.json
+```
+
+The final state is set in Step 6 from each verdict: `done` when confidence moved on
+evidence, `blocked` when every `derisking` approach came back `blocked: true`.
+
 ### Step 5 — Score confidence from the evidence
 
 Convert each spike's findings into a **signed** confidence. Sign = direction the
@@ -157,6 +172,14 @@ python3 .amplifier/skills/derisk-assumptions/scripts/update_confidence.py \
 ```
 
 Verify the diff: only `confidence`/`derisking` on the targeted ids changed.
+
+Then close out each id's run-state so the check-in skill sees it as settled — `done`
+for a resolved spike, `blocked` for one whose approaches are all blocked:
+
+```bash
+printf '{"state":"done","updated":"%s"}\n' "$(date -u +%FT%TZ)" \
+  > ./.amplifier/revisioner/data/<id>/status.json
+```
 
 ### Step 7 — Report
 
