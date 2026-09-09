@@ -5,9 +5,9 @@ description: >-
   and are being de-risked. Reads the revisioner risky-assumptions.yaml plus the
   live per-spike status.json files, classifies every assumption (holds / fails /
   blocked / in-flight / open), and drives one of three conversations: report
-  all-clear when the load-bearing bets hold, ask the user to supply what blocked
+  all-clear when the high-risk assumptions hold, ask the user to supply what blocked
   spikes need (then resume de-risking), or propose a vision update/pivot when
-  evidence has invalidated a load-bearing assumption. Use when the user asks
+  evidence has invalidated a high-risk assumption. Use when the user asks
   "where do we stand", "check in on the vision", "what's blocked", "are we
   de-risked yet", or after de-risking spikes have run. It reads state and steers;
   it never sets risk or confidence itself.
@@ -31,7 +31,7 @@ has ingredients of several — lead with the highest-priority one):
 | Mode | Fires when | You do |
 |---|---|---|
 | **stale** | `vision.md` changed since the ledger was built | Stop: the whole ledger is suspect. Re-run `find-risky-assumptions` on the current vision before trusting any bet. |
-| **all-clear** | every high-risk assumption **holds** | Report success: the load-bearing bets are de-risked. Done. |
+| **all-clear** | every high-risk assumption **holds** | Report success: the high-risk assumptions are de-risked. Done. |
 | **unblock** | a high-risk assumption is **blocked** | Ask the user for exactly the `needs:` items — or propose an alternative spike — then **resume de-risking** on those ids. |
 | **pivot** | a high-risk assumption **fails** (risk realized) | Propose how the vision could change, as a **diff for approval**; on OK, archive the stale bets and **re-run find + derisk** on the new vision. |
 
@@ -41,7 +41,7 @@ the mode is **in_progress**: report progress and offer to launch/continue de-ris
 Priority when several apply: **stale > pivot > unblock > (in_progress) > all-clear**. A
 changed vision outranks everything — there is no point reasoning about a realized risk on
 a bet the current vision may no longer even make. After that, a realized risk on a
-load-bearing bet is the most consequential thing on the board; surface it first.
+high-risk assumption is the most consequential thing on the board; surface it first.
 
 **How stale is detected.** At generation time `find-risky-assumptions` stamps the ledger
 with a `sha256` of `vision.md` (via `stamp_vision.py`). On every check-in the classifier
@@ -57,7 +57,7 @@ flagged on a positive mismatch, never guessed.
 | `confidence` | `−1.00 … +1.00` — signed belief it holds | `derisk-assumptions` |
 
 Thresholds (defaults, overridable as flags on the classifier): **holds** `confidence ≥ +0.7`,
-**fails** `confidence ≤ −0.7`, **high-risk / load-bearing** `risk ≥ 0.7`.
+**fails** `confidence ≤ −0.7`, **high-risk** `risk ≥ 0.7`.
 
 ## Files & paths
 
@@ -91,7 +91,7 @@ Add `--json` when you want to drive logic off the result. The classifier is **re
 
 ### Step 2 — Report the snapshot honestly
 
-Give the user the board before the ask: how many load-bearing bets hold, what is
+Give the user the board before the ask: how many high-risk assumptions hold, what is
 **in flight** right now (do not misreport a running spike as untested or failed), what is
 blocked, and any realized risks. Read `data/<id>/findings.md` for the headline on
 anything that flipped. Then move to the conversation for the recommended mode.
@@ -104,7 +104,7 @@ vision. Do not walk the buckets or propose a pivot. Tell the user the vision dri
 then re-run `find-risky-assumptions` on the current vision (it re-stamps the ledger) and
 snapshot again. Everything else waits on that.
 
-**all-clear.** State plainly that every load-bearing assumption now holds, cite the
+**all-clear.** State plainly that every high-risk assumption now holds, cite the
 confidence + evidence pointer for each, and note any low-risk residuals the user may
 choose to ignore. Nothing to do.
 
@@ -112,7 +112,7 @@ choose to ignore. Nothing to do.
 block. Ask the user to supply it, or offer an alternative spike that routes around the
 block. Do **not** invent a confidence — blocked means unknown.
 
-**pivot.** For each failed load-bearing assumption, explain what the evidence showed
+**pivot.** For each failed high-risk assumption, explain what the evidence showed
 (pointer to `findings.md`), then propose concrete ways the vision could change to stop
 depending on the false bet. Present it as a **diff against `vision.md`** and wait for
 approval. Never rewrite the vision silently.
@@ -162,5 +162,5 @@ one-shot gate.
   explicit approval.
 - **Pivot archives, never deletes.** Stale assumptions move current → past and their
   `data/<id>/` evidence stays on disk. Nothing is destroyed on a pivot.
-- **Lead with the realized risk.** When a load-bearing bet has failed, that is the
+- **Lead with the realized risk.** When a high-risk assumption has failed, that is the
   headline — surface it before blocks or all-clears.

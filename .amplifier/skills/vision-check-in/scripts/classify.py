@@ -281,7 +281,7 @@ def render_human(result: dict[str, Any]) -> str:
                 for need in r["needs"]:
                     lines.append(f"        needs: {need}")
     lines.append("")
-    lines.append("  (* = high-risk / load-bearing)")
+    lines.append("  (* = high-risk)")
     return "\n".join(lines)
 
 

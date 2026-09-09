@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Archive assumptions on a vision pivot: move them current -> past, unchanged.
 
-When evidence invalidates a load-bearing assumption and the user OKs a vision
+When evidence invalidates a high-risk assumption and the user OKs a vision
 change, the assumptions the old vision rested on are no longer live bets -- but they
 are not deleted either. They move from
 

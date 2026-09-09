@@ -143,7 +143,7 @@ def test_blocked_via_derisking_all_blocked_without_status(tmp_path):
 def test_low_risk_fail_does_not_trigger_pivot(tmp_path):
     write_status(tmp_path, "RA-lowfail", "done")
     result = run_classify([entry("RA-lowfail", risk=0.3, confidence=-0.9)], tmp_path)
-    # It's a fail, but not load-bearing -> no pivot.
+    # It's a fail, but not high-risk -> no pivot.
     assert result["recommended_mode"] != "pivot"
     assert result["counts"]["fails"] == 1
 

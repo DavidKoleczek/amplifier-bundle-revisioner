@@ -49,16 +49,16 @@ edited *outside* that flow — the safety net, not the normal path.
 
 **Fires when** every high-risk (`risk ≥ 0.7`) assumption holds (`confidence ≥ +0.7`).
 
-**Goal:** confirm the load-bearing bets are de-risked and hand the user a clean bill.
+**Goal:** confirm the high-risk assumptions are de-risked and hand the user a clean bill.
 
-1. State it plainly: the vision's load-bearing assumptions have held up under evidence.
+1. State it plainly: the vision's high-risk assumptions have held up under evidence.
 2. For each, cite `confidence` and point at `data/<id>/findings.md` so the claim is
    auditable, not asserted.
 3. Note any **low-risk residuals** still open or blocked, and frame them as optional —
    the user can accept them without another spike.
 4. Nothing to do. Do not manufacture further work.
 
-> All five load-bearing bets now hold (conf +0.72 … +0.91; evidence in each
+> All five high-risk assumptions now hold (conf +0.72 … +0.91; evidence in each
 > `data/<id>/findings.md`). Two low-risk assumptions remain untested (RA-…, RA-…) — not
 > worth a spike unless you want the completeness. I'd call this vision de-risked.
 

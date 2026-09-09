@@ -18,7 +18,7 @@ description: >-
 
 A vision document is a bet. It commits to building something, and every commitment
 rests on things the author believes are true but has not proven. Those beliefs are
-**assumptions**. The dangerous ones — load-bearing and unvalidated — are what sink a
+**assumptions**. The dangerous ones, the risky and unvalidated, are what sink a
 project six months in. This skill reads a vision and surfaces those assumptions
 *before* anyone spends effort building on them, so a later de-risking pass can test
 each one.
@@ -143,7 +143,7 @@ Anchors:
 
 | Risk | Meaning |
 |---|---|
-| `0.85–1.00` | Load-bearing — if false, the vision largely fails. Core mechanisms and external permissions/policy you don't control often land here. |
+| `0.85–1.00` | High-risk — if false, the vision largely fails. Core mechanisms and external permissions/policy you don't control often land here. |
 | `0.55–0.80` | Important — its failure would seriously threaten the vision. |
 | `0.30–0.50` | Matters, but the vision could absorb or route around its failure. |
 | `0.05–0.25` | Minor — worth recording, but low consequence if false. |
@@ -209,14 +209,14 @@ line. Keep it tight.
 
 ## What makes a good risky-assumption entry
 
-A strong entry is **atomic, declarative, falsifiable, and load-bearing.**
+A strong entry is **atomic, declarative, falsifiable, and risky.**
 
 - **Atomic** — one claim. Split "the API is fast and cheap" into two.
 - **Declarative** — a statement taken for granted, not a question. Write the belief the
   author is holding, phrased so it *could* be true or false.
 - **Falsifiable** — a later spike could gather evidence for or against it. If it can't
   be tested, it's an opinion, not an assumption.
-- **Load-bearing** — its falsity would threaten the vision. Trivia doesn't belong.
+- **Risky** — its falsity would threaten the vision. Trivia doesn't belong.
 
 **Examples**
 
@@ -230,7 +230,7 @@ users will love having triage automated."*
 
 Input: *"We'll add EasyAuth to the static web app for login."*
 
-- Good: `Adding EasyAuth to SWA is permitted by our Azure subscription's policies.` (viability/permission; high risk — external, unproven, load-bearing)
+- Good: `Adding EasyAuth to SWA is permitted by our Azure subscription's policies.` (viability/permission; high risk, external and unproven)
 - Bad: `EasyAuth is a good idea.` — subjective, not falsifiable.
 
 ---

@@ -6,7 +6,7 @@ previous lens was blind to. Work every section below. For each prompt, ask the s
 underlying question: *what is the author taking for granted that could be false, and
 would matter if it were?*
 
-Record only genuinely risky, load-bearing beliefs. The prompts are a net, not a quota.
+Record only genuinely risky beliefs. The prompts are a net, not a quota.
 
 ---
 
@@ -101,6 +101,6 @@ Skim the vision specifically for these; each is usually sitting on an unexamined
 
 Once a lens surfaces something, shape it before recording (see the quality bar in
 SKILL.md): make it **atomic**, **declarative** (the belief, not a question),
-**falsifiable** (a spike could test it), and confirm it is **load-bearing**. Then check
+**falsifiable** (a spike could test it), and confirm it is genuinely **risky**. Then check
 it is not already in the file, and score its `risk` by stakes alone — how much the
 vision's success depends on it — leaving `confidence` at its untested `0.0` default.
