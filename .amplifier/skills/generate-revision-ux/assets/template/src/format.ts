@@ -1,29 +1,48 @@
 import type { Category, Mode, Row } from "./types";
 
 export const CATEGORY_LABEL: Record<Category, string> = {
-  fails: "INVALIDATED",
-  blocked: "BLOCKED",
-  in_flight: "IN FLIGHT",
-  open: "OPEN",
-  holds: "HOLDS",
+  fails: "Does not hold",
+  blocked: "Blocked",
+  in_flight: "In progress",
+  open: "Open",
+  holds: "Holds",
 };
 
 // Blocked is not failed: a blocked spike means unknown. Distinct label and colour.
 export const CATEGORY_HINT: Record<Category, string> = {
-  fails: "evidence came back against this bet",
-  blocked: "needs something only you can supply",
-  in_flight: "a spike is running now",
-  open: "untested or inconclusive, still spike-able",
-  holds: "de-risked, the bet looks true",
+  fails: "Evidence is strong enough against this assumption.",
+  blocked: "More evidence needs access, data, or a decision from you. Blocked does not mean false.",
+  in_flight: "An evidence-gathering spike is running.",
+  open: "Not yet tested or evidence is inconclusive. More testing is possible.",
+  holds: "Evidence is strong enough to support this assumption.",
 };
 
 export const MODE_HINT: Record<Mode, string> = {
-  pivot: "a high-risk assumption failed - the vision should change",
-  unblock: "a high-risk assumption is blocked - it needs something from you",
-  in_progress: "work remains; let the spikes run",
-  all_clear: "every high-risk assumption holds",
-  stale: "the vision changed since this ledger was built - re-run find-risky-assumptions",
+  pivot: "Review the evidence and consider amending the vision.",
+  unblock: "Provide the access, data, or decisions needed below.",
+  in_progress: "Continue gathering evidence for open assumptions.",
+  all_clear: "No intervention is needed on high-priority assumptions.",
+  stale: "Refresh assumptions against the changed vision before deciding.",
 };
+
+export const PRIORITY_HINT =
+  "Priority is the stakes: how much the vision depends on an assumption. " +
+  "0 = little dependency; 1 = essential. It is not confidence or urgency. " +
+  "High is the classifier's designation.";
+
+export function runState(value: string): string {
+  const labels: Record<string, string> = {
+    unset: "Not recorded", running: "Running", done: "Done", blocked: "Blocked",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+export function timestamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, {
+    dateStyle: "medium", timeStyle: "short", timeZoneName: undefined,
+  });
+}
 
 export function signed(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;

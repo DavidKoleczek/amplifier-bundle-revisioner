@@ -21,6 +21,16 @@ is in this file or in the artifacts copied beside it.
 Every file above is optional except the ledger. A spike that captured nothing but a
 `status.json` is a real state and renders as such.
 
+The ledger is a YAML list of section mappings. Recognized sections are
+`assumptions_related_to_current_vision` and `assumptions_related_to_past_visions`,
+each a list of assumption mappings; either can be omitted, but at least one must exist.
+IDs are unique across both sections, nonempty strings using letters, digits, `_`, `-`,
+and `.` (not starting with `.`). No `RA-` prefix is required. Assumption text is nonempty.
+Present axes are finite numbers: `risk` in [0, 1], `confidence` in [-1, 1].
+Missing or null axes retain the classifier's zero default without changing the ledger.
+`derisking` can be absent, null, or a list of mappings; present `approach` and `needs`
+are strings, and present `blocked` is boolean. Unknown additive fields are accepted.
+
 ## Emitted shape
 
 ```jsonc
@@ -86,6 +96,12 @@ Every file above is optional except the ledger. A spike that captured nothing bu
   "past_assumptions": [
     {"id": "RA-xxxxxx", "assumption": "...", "risk": 0.6, "confidence": -0.8,
      "archived_note": "pivot: ..."}
+  ],
+
+  // Optional, only emitted when a document could not be inlined.
+  // Paths are relative to the source state directory.
+  "warnings": [
+    {"path": "data/RA-xxxxxx/verdict.json", "message": "Cannot inline verdict: expected a JSON object"}
   ]
 }
 ```
@@ -97,16 +113,34 @@ Every file above is optional except the ledger. A spike that captured nothing bu
 unchanged. Thresholds live in one place. If the classifier is missing the build fails
 loudly rather than guessing at buckets.
 
+**Validate before writing output.** Invalid ledger sections, IDs, axes, or approach
+types stop the build. Classifier output must have the documented renderable structure
+and row IDs matching the current ledger; it is validated, never recategorized.
+Serialization rejects non-finite numbers rather than emitting `NaN`.
+
 **Absence is data.** A missing `findings.md` emits `null`, not an empty string and not a
 placeholder sentence. The template distinguishes "this spike produced no write-up" from
 "this spike wrote nothing down", and it can only do that if the builder does not paper
 over the gap.
 
-**Artifacts are indexed, not inlined.** `spike_plan`, `findings`, and `verdict` are
+**Malformed is not missing.** A present `status.json` must be an object with `state`
+equal to `running`, `done`, or `blocked` and a string `updated` when present; otherwise
+the build stops with a file-specific error before writing output. A malformed or
+non-object verdict emits `null` and a warning, with `verdict.json` indexed for raw
+retrieval. Unreadable optional text emits `null` and a warning; existing empty text
+stays `""`. Permission errors always stop the build. Valid verdict objects retain their
+fields without requiring one fixed verdict shape.
+
+**Artifacts are indexed, not inlined.** `spike_plan`, `findings`, `status`, and `verdict` are
 inlined because the UI always shows them. Everything else in `data/<id>/` is listed with
 a path relative to `public/`, and the whole `data/` tree is copied to `public/data/` so
 those paths resolve as ordinary links. Binary and large files stay on disk where they do
-not bloat the JSON.
+not bloat the JSON. Optional spike documents that could not be inlined also keep raw links.
+
+**Labels do not change data.** The UI presents `risk` as **Priority**, meaning stakes
+for the vision, not urgency. Confidence is signed evidence strength, not probability:
+-1 is strong evidence against, 0 is unknown/inconclusive, and +1 is strong evidence
+supporting the assumption. Presentation adapts to optional evidence without inventing it.
 
 **Paths are relative and posix.** Nothing absolute reaches the browser, so the generated
 directory can be moved or served from anywhere.

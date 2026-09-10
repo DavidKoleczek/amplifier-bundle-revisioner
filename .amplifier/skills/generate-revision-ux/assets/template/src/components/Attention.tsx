@@ -1,86 +1,52 @@
 import type { Row } from "../types";
-import { MODE_HINT, byAttention, signed } from "../format";
-import type { Mode } from "../types";
-
-interface CardProps {
-  row: Row;
-  kind: "fails" | "blocked";
-  onSelect: (id: string) => void;
-}
-
-function AttentionCard({ row, kind, onSelect }: CardProps) {
-  return (
-    <div className={`card card-${kind}`}>
-      <div className="card-head">
-        <button className="link-id" onClick={() => onSelect(row.id)}>
-          {row.id}
-        </button>
-        <span className={`tag tag-${kind}`}>
-          {kind === "fails" ? "INVALIDATED" : "BLOCKED"}
-        </span>
-        {row.high_risk && <span className="tag tag-high">HIGH RISK</span>}
-        <span className="nums">
-          risk {row.risk.toFixed(2)} &middot; confidence {signed(row.confidence)}
-        </span>
-      </div>
-      <p className="assumption">{row.assumption}</p>
-      {kind === "blocked" &&
-        (row.needs.length > 0 ? (
-          <>
-            <div className="needs-label">Needs from you:</div>
-            <ul className="needs">
-              {row.needs.map((need, i) => (
-                <li key={i}>{need}</li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <div className="muted">
-            No <code>needs:</code> recorded - the spike reported blocked without naming
-            what is missing.
-          </div>
-        ))}
-    </div>
-  );
-}
+import { CATEGORY_LABEL, byAttention } from "../format";
 
 interface Props {
   fails: Row[];
   blocked: Row[];
-  mode: Mode;
   onSelect: (id: string) => void;
 }
 
-export default function Attention({ fails, blocked, mode, onSelect }: Props) {
-  const nothing = fails.length === 0 && blocked.length === 0;
+export default function Attention({ fails, blocked, onSelect }: Props) {
+  const actionable = [...fails, ...blocked].filter((row) => row.high_risk).sort(byAttention);
   return (
-    <section>
-      <h2>1 &middot; Needs your attention</h2>
-      {nothing && (
-        <p className="empty">
-          Nothing is waiting on you. Recommended mode is <b>{mode}</b> &mdash;{" "}
-          {MODE_HINT[mode]}.
-        </p>
-      )}
-      {fails.length > 0 && (
-        <>
-          <h3 className="sub">
-            The evidence says the vision should change ({fails.length})
-          </h3>
-          {[...fails].sort(byAttention).map((row) => (
-            <AttentionCard key={row.id} row={row} kind="fails" onSelect={onSelect} />
+    <section aria-labelledby="attention-heading">
+      <div className="section-heading">
+        <div>
+          <h2 id="attention-heading">Needs your attention</h2>
+          <p className="muted">High-priority assumptions that do not hold or need your help to test.</p>
+        </div>
+        <span className="section-count">{actionable.length}</span>
+      </div>
+      {actionable.length === 0 ? (
+        <p className="surface empty-state">No high-priority failures or blockers in this snapshot.</p>
+      ) : (
+        <div className="attention-grid">
+          {actionable.map((row) => (
+            <article className={`surface attention-card card-${row.category}`} key={row.id}>
+              <div className="card-meta">
+                <span className={`tag tag-${row.category}`}>{CATEGORY_LABEL[row.category]}</span>
+                <span className="small muted">High priority · {row.risk.toFixed(2)}</span>
+              </div>
+              <h3 className="assumption">{row.assumption}</h3>
+              <div className="mono small muted">{row.id}</div>
+              {row.category === "fails" ? (
+                <p>Review what the evidence challenges before deciding how to amend the vision.</p>
+              ) : (
+                <div className="needs-block">
+                  <h4>Needed from you</h4>
+                  {row.needs.length ? <ul className="needs">
+                    {row.needs.map((need, i) => <li key={i}>{need}</li>)}
+                  </ul> : <p className="muted">The blocker does not name what is needed.</p>}
+                </div>
+              )}
+              <button className="button" onClick={() => onSelect(row.id)}
+                aria-label={`Review evidence for ${row.id}`} aria-controls="evidence">
+                Review evidence <span aria-hidden="true">↗</span>
+              </button>
+            </article>
           ))}
-        </>
-      )}
-      {blocked.length > 0 && (
-        <>
-          <h3 className="sub">
-            The tool needs something only you can supply ({blocked.length})
-          </h3>
-          {[...blocked].sort(byAttention).map((row) => (
-            <AttentionCard key={row.id} row={row} kind="blocked" onSelect={onSelect} />
-          ))}
-        </>
+        </div>
       )}
     </section>
   );

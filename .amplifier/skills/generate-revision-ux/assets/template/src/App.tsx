@@ -1,80 +1,89 @@
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import type { RevisionState } from "./types";
-import { CATEGORY_LABEL, MODE_HINT, signed } from "./format";
+import { CATEGORY_LABEL, MODE_HINT, timestamp } from "./format";
+import { parseRevisionState } from "./loadState";
 import Attention from "./components/Attention";
 import Board from "./components/Board";
-import DrillDown from "./components/DrillDown";
+import Confidence from "./components/Confidence";
+import DrillDown, { Document } from "./components/DrillDown";
 
 type Load =
   | { phase: "loading" }
   | { phase: "error"; message: string }
   | { phase: "ready"; state: RevisionState };
 
-function Header({ state }: { state: RevisionState }) {
+export function Header({ state }: { state: RevisionState }) {
   const { classification: c } = state;
   const drift = c.vision_drift;
+  const sourcePath = "vision.md";
   return (
-    <header>
-      <h1>
-        ReVisioner &mdash; <span className="mono">{state.repo}</span>
-      </h1>
-      <div className="mode">
-        Recommended mode: <b>{c.recommended_mode}</b>{" "}
-        <span className="muted">&mdash; {MODE_HINT[c.recommended_mode]}</span>
+    <header className="page-header">
+      <div className="brand-line">
+        <span className="brand">ReVisioner</span>
+        <span className="muted repo-name">{state.repo}</span>
+        <span className="snapshot-label">Read-only snapshot</span>
       </div>
-      {drift?.stale && (
-        <div className="drift">
-          Vision drift: vision.md changed since this ledger was built. The assumptions
-          below are stale.
-        </div>
-      )}
-      <div className="counts">
-        {(Object.keys(CATEGORY_LABEL) as (keyof typeof CATEGORY_LABEL)[]).map((cat) => (
-          <span key={cat} className={`count tag-${cat}`}>
-            {CATEGORY_LABEL[cat]} {c.counts[cat] ?? 0}
+      <h1>Revision overview</h1>
+      <div className="next-action">
+        <span className="metric-label">Recommended next action</span>
+        <p>{MODE_HINT[c.recommended_mode]}</p>
+      </div>
+      <p className="small muted">
+        Snapshot <time dateTime={state.generated_at} title={state.generated_at}>{timestamp(state.generated_at)}</time>
+        {" · Local time · Regenerate the dashboard to refresh."}
+      </p>
+      {drift?.stale ? (
+        <p className="notice">
+          <strong>Vision changed.</strong> These assumptions reflect an earlier vision. Refresh them before relying on this classification.
+        </p>
+      ) : !drift?.checked ? (
+        <p className="notice notice-neutral">
+          <strong>Vision freshness not checked.</strong> This snapshot does not establish whether the assumptions match the current vision.
+        </p>
+      ) : <p className="small muted">Vision matched the ledger when this snapshot was generated.</p>}
+      <div className="counts" aria-label="Assumption counts">
+        {(Object.keys(CATEGORY_LABEL) as (keyof typeof CATEGORY_LABEL)[]).map((category) => (
+          <span key={category} className="count">
+            <span className={`count-dot dot-${category}`} aria-hidden="true" />
+            <strong>{c.counts[category]}</strong> {CATEGORY_LABEL[category]}
           </span>
         ))}
-        <span className="count">
-          high-risk holding {c.high_risk_holding}/{c.high_risk_total}
-        </span>
+        <span className="count holding-count"><strong>{c.high_risk_holding}/{c.high_risk_total}</strong> high-priority holding</span>
       </div>
-      <div className="muted small">
-        Generated {state.generated_at} from {state.vision.path}
-      </div>
-      <details className="vision">
-        <summary>Vision document</summary>
-        {state.vision.markdown === null ? (
-          <p className="empty">No vision.md found at {state.vision.path}.</p>
-        ) : (
-          <pre className="pre">{state.vision.markdown}</pre>
-        )}
+      <details className="surface vision disclosure">
+        <summary>Vision document <span className="small muted">{state.vision.path}</span></summary>
+        <Document title="Vision" value={state.vision.markdown} path={sourcePath}
+          artifacts={Object.values(state.evidence).flatMap((entry) => entry.artifacts)}
+          warning={state.warnings?.some((warning) => warning.path === sourcePath)} />
       </details>
     </header>
   );
 }
 
-function PastAssumptions({ state }: { state: RevisionState }) {
-  const past = state.past_assumptions ?? [];
+export function PastAssumptions({ state }: { state: RevisionState }) {
+  if (state.past_assumptions.length === 0) return null;
   return (
-    <details className="past">
-      <summary>4 &middot; Past-vision assumptions ({past.length})</summary>
-      {past.length === 0 ? (
-        <p className="empty">No past-vision assumptions recorded.</p>
-      ) : (
-        <ul>
-          {past.map((entry) => (
-            <li key={entry.id}>
-              <span className="mono">{entry.id}</span>{" "}
-              <span className="nums">
-                risk {(entry.risk ?? 0).toFixed(2)} &middot; confidence{" "}
-                {signed(entry.confidence ?? 0)}
-              </span>
-              <div>{entry.assumption}</div>
-              {entry.archived_note && <div className="muted">{entry.archived_note}</div>}
-            </li>
-          ))}
-        </ul>
-      )}
+    <details className="surface past disclosure">
+      <summary>Past-vision assumptions <span className="muted">({state.past_assumptions.length})</span></summary>
+      <p className="small muted">Historical context, excluded from the current classification. Priority still means dependency, not urgency.</p>
+      <ul className="past-list">
+        {state.past_assumptions.map((entry) => (
+          <li key={entry.id}>
+            <h3 className="assumption">{entry.assumption}</h3>
+            <span className="mono muted small">{entry.id}</span>
+            <div className="past-metrics">
+              <div><div className="metric-label">Priority</div>
+                <span className="nums">{entry.risk == null ? "Not recorded" : entry.risk.toFixed(2)}</span>
+              </div>
+              <div><div className="metric-label">Confidence</div>
+                <Confidence value={entry.confidence} label={`Historical confidence for ${entry.id}`} />
+              </div>
+            </div>
+            {entry.archived_note && <p className="source-text muted">{entry.archived_note}</p>}
+          </li>
+        ))}
+      </ul>
     </details>
   );
 }
@@ -84,15 +93,17 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/revision-state.json")
+    const controller = new AbortController();
+    fetch("/revision-state.json", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<RevisionState>;
+        return response.json() as Promise<unknown>;
       })
-      .then((state) => setLoad({ phase: "ready", state }))
-      .catch((error: unknown) =>
-        setLoad({ phase: "error", message: String(error) }),
-      );
+      .then((value) => setLoad({ phase: "ready", state: parseRevisionState(value) }))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setLoad({ phase: "error", message: String(error) });
+      });
+    return () => controller.abort();
   }, []);
 
   const state = load.phase === "ready" ? load.state : null;
@@ -100,41 +111,45 @@ export default function App() {
     () => state?.classification.rows.find((row) => row.id === selected) ?? null,
     [state, selected],
   );
+  const onSelect = (id: string) => {
+    flushSync(() => setSelected(id));
+    const heading = document.getElementById("evidence-heading");
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  };
 
-  if (load.phase === "loading") return <main className="wrap">Loading&hellip;</main>;
-
-  if (load.phase === "error") {
-    return (
-      <main className="wrap">
-        <h1>No state to render</h1>
-        <p className="error">Could not load /revision-state.json ({load.message}).</p>
-        <p>Generate it from the repo root, then reload this page:</p>
-        <pre className="pre">
-          python3 .amplifier/skills/generate-revision-ux/scripts/build_ux.py
-        </pre>
-      </main>
-    );
-  }
+  if (load.phase === "loading") return <main className="wrap" aria-busy="true">Loading revision snapshot…</main>;
+  if (load.phase === "error") return (
+    <main className="wrap">
+      <h1>Could not display this snapshot</h1>
+      <p className="error" role="alert">{load.message}</p>
+      <p>Generate the dashboard from the repository root, then reload this page:</p>
+      <pre className="pre">python3 .amplifier/skills/generate-revision-ux/scripts/build_ux.py</pre>
+    </main>
+  );
 
   const current = load.state;
   return (
     <main className="wrap">
       <Header state={current} />
-      <Attention
-        fails={current.classification.buckets.fails ?? []}
-        blocked={current.classification.buckets.blocked ?? []}
-        mode={current.classification.recommended_mode}
-        onSelect={setSelected}
-      />
-      <Board
-        rows={current.classification.rows}
-        selected={selected}
-        onSelect={setSelected}
-      />
-      <DrillDown
-        row={selectedRow}
+      {!!current.warnings?.length && (
+        <aside className="notice data-warnings" aria-labelledby="warnings-heading">
+          <h2 id="warnings-heading">Data warnings ({current.warnings.length})</h2>
+          <p>Some source files could not be read. Unavailable content is not evidence of absence.</p>
+          <ul>{current.warnings.map((warning, i) =>
+            <li key={i}><code>{warning.path}</code>: {warning.message}</li>)}</ul>
+        </aside>
+      )}
+      <Attention fails={current.classification.buckets.fails}
+        blocked={current.classification.buckets.blocked} onSelect={onSelect} />
+      <Board rows={current.classification.rows} selected={selected} onSelect={onSelect} />
+      <DrillDown row={selectedRow}
         evidence={selected ? (current.evidence[selected] ?? null) : null}
-      />
+        artifacts={Object.values(current.evidence).flatMap((entry) => entry.artifacts)}
+        warnings={current.warnings} />
       <PastAssumptions state={current} />
     </main>
   );

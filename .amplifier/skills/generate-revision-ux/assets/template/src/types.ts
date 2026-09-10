@@ -68,8 +68,8 @@ export interface Evidence {
 export interface PastAssumption {
   id: string;
   assumption: string;
-  risk?: number;
-  confidence?: number;
+  risk?: number | null;
+  confidence?: number | null;
   archived_note?: string;
   [key: string]: unknown;
 }
@@ -81,4 +81,5 @@ export interface RevisionState {
   classification: Classification;
   evidence: Record<string, Evidence>;
   past_assumptions: PastAssumption[];
+  warnings?: Array<{ path: string; message: string }>;
 }

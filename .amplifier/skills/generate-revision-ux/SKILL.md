@@ -16,15 +16,8 @@ description: >-
 
 # Generate revision UX
 
-A terminal check-in is a snapshot that scrolls away. Once a vision has more than a
-handful of assumptions, and each one has a spike plan, a findings write-up, and a pile
-of raw artifacts behind it, the thing a human actually needs is a surface they can scan
-and then click into. This skill produces that surface from state already on disk.
-
-The UI answers one question first and everything else second: **what needs the user
-right now?** That is the small set of assumptions whose evidence says the vision must
-change, plus the ones whose spikes are stuck waiting on access or data only the user
-can supply. Everything else is drill-down, available but not competing for attention.
+Set up the bundled dashboard from state already on disk, validate it, and serve it
+for the user. The template owns the UI; this skill does not design or customize it.
 
 You are not producing findings here, and you are not moving `risk` or `confidence`.
 This skill reads state and renders it.
@@ -53,9 +46,26 @@ Check that `./.amplifier/revisioner/risky-assumptions.yaml` exists. If it does n
 stop and point the user at `find-risky-assumptions`: an empty ledger renders an empty
 page, which wastes their time and teaches them nothing.
 
-A ledger with entries but no `data/` directories is fine and worth rendering. It shows
-every assumption as open, which is an honest picture of a vision whose bets have been
-found but not yet tested.
+A ledger with entries but no `data/` directories is fine. The classifier still uses
+recorded confidence and approaches; missing spike files do not imply an open verdict.
+
+Before building, compare the actual state with `references/state-contract.md`:
+
+- Inspect the ledger's section shapes, entry counts, IDs, axis ranges, and optional
+  fields such as `derisking` and past-vision notes. Do not assume a fixed assumption
+  count or require every spike to have evidence.
+- Inventory spike directories and artifact names, extensions, and byte sizes, including
+  nested paths. Summarize totals and at most 30 file entries; do not read raw artifacts
+  wholesale. Sample up to three spike directories with different available fields.
+  Read at most 80 lines per sampled plan/findings file and inspect status/verdict
+  objects under 16 KiB for their keys and types; otherwise inspect size only and let
+  the builder validate them. Missing files and empty files are different states.
+- Do not invent evidence, convert the ledger, or alter classifier categories.
+- If sections, scales, or required field types are incompatible, stop and name the
+  file, field, expected shape/range, and owning skill that must resolve it. Do not guess
+  a conversion. Review builder warnings for optional unreadable documents; malformed
+  status is a build error, while a malformed verdict retains a raw artifact link.
+  Stop on permission errors rather than treating inaccessible files as absent.
 
 ### Step 2 - Build
 
@@ -69,6 +79,10 @@ spike's `spike-plan.md`, `findings.md`, and `verdict.json`, indexes the remainin
 artifacts, and writes everything to `./.amplifier/revisioner/ux/public/revision-state.json`.
 The bundled template is copied alongside it.
 
+Review builder warnings and compare the generated data with the source ledger and
+classifier output: entries, axes, buckets, and recommended mode must agree. Use bounded
+reads when investigating discrepancies; do not repair source state in this skill.
+
 Useful flags (`--help` lists all of them):
 
 ```bash
@@ -80,16 +94,23 @@ Useful flags (`--help` lists all of them):
 Reach for `--data-only` when spikes have finished since the last build and the user
 already has the dev server running. The page picks up the new state on reload.
 
-### Step 3 - Serve it
+### Step 3 - Validate and serve it
 
 Finish the job. A user who asked to see the state should not have to install
 dependencies and start a dev server to get there, so run it for them and hand back a URL.
 
 The app is a Vite + React project with no backend. Install with `pnpm` when it is on
-PATH, otherwise `npm`, then start the server in the background so it outlives the turn:
+PATH, otherwise `npm`. Run the generated app's tests and production build after install
+(use the equivalent `pnpm` commands when selected):
 
 ```bash
-cd .amplifier/revisioner/ux && npm install
+cd .amplifier/revisioner/ux && npm install && npm test && npm run build
+```
+
+If any check fails, stop and report it. After checks pass, start the server from the
+generated app directory in the background so it outlives the turn:
+
+```bash
 setsid nohup npm run dev > /tmp/revision-ux.log 2>&1 < /dev/null & disown
 ```
 
@@ -97,9 +118,12 @@ setsid nohup npm run dev > /tmp/revision-ux.log 2>&1 < /dev/null & disown
 with it, so the server disappears the moment the command that launched it returns, and
 the URL you hand over is already dead.
 
-Poll `/tmp/revision-ux.log` until Vite prints its `Local:` line, then read the URL from
-there rather than assuming a port. Vite moves to the next free port when the configured
-one is taken, so a guessed URL sends the user to whatever else is running.
+Let Vite automatically select an available port starting at `5183`, falling back to
+the next free port when it is taken. Do not ask the user to choose a port, stop unrelated
+listeners, or enable `strictPort`.
+
+Poll `/tmp/revision-ux.log` until Vite prints its `Local:` line, then read the actual URL
+from there rather than assuming a port.
 
 Confirm it actually serves before claiming it works:
 
@@ -108,53 +132,19 @@ curl -sf -o /dev/null -w '%{http_code}\n' <url> && \
 curl -sf -o /dev/null -w '%{http_code}\n' <url>/revision-state.json
 ```
 
-Two 200s means the page and its data are both reachable. Do not open a browser for the
-user, and do not assume the host has one.
-
-Leave the server running and tell the user how to stop it. Its log path is worth giving
-them too, since a dev server that dies later leaves them with a dead tab and no clue why.
+Two 200s means the page and its data are reachable, not that the UI renders correctly.
+If browser automation is available, verify rendering and evidence navigation against
+the actual generated data. Otherwise disclose that browser validation was not performed.
+Do not open a browser for the user, and do not assume the host has one.
 
 For a version that can be handed to someone who will not run a dev server, `npm run build`
 emits a static bundle under `dist/` that any static file host can serve.
 
-### Step 4 - Report what they are about to see
+### Step 4 - Hand back the dashboard
 
-Do not make them discover the headline by reading the screen. Lead with the URL, then say
-it: the recommended mode, how many high-risk assumptions hold, and specifically which
-assumptions are asking for their attention and what each one wants from them. The UI is
-where they go to act on that, not where they learn it for the first time.
-
----
-
-## What the UI shows
-
-The template renders three regions, in priority order, and that order is the point.
-
-**Needs your attention.** Assumptions where evidence has come back against a
-high-risk assumption (the vision should change) and assumptions whose spikes are blocked
-(the user has something the tool cannot get). Each carries its verbatim `needs:` items,
-because "unblock this" without naming what is missing is not actionable.
-
-**The board.** Every current-vision assumption with its risk, signed confidence,
-category, and run state. This is the scan surface. It exists so the user can confirm the
-attention list is not hiding something, not so they can read fourteen rows carefully.
-
-**Drill-down.** Selecting an assumption opens its spike plan, its findings, its recorded
-verdict, and links to every raw artifact the spike captured. This is what makes a verdict
-auditable rather than something the user has to take on faith.
-
-Past-vision assumptions render in a separate collapsed region. They are kept so a pivot's
-history stays visible, and they are out of the way because they are settled.
-
-## Modifying the template
-
-The template is a starting point, not a fixed product. When a user wants different
-framing, edit `assets/template/src/` in the skill so the change survives the next build,
-rather than editing the generated copy under `ux/`, which is overwritten.
-
-Read `references/state-contract.md` before changing anything that touches data. It
-documents the exact shape of `revision-state.json`, including which fields come straight
-from `classify.py` and therefore change only if that classifier changes.
+Lead with the actual URL and briefly report the checks performed, warnings, and any
+validation not completed. Leave the server running; give a stop command scoped to that
+server and its log path, `/tmp/revision-ux.log`.
 
 ---
 
@@ -165,9 +155,3 @@ from `classify.py` and therefore change only if that classifier changes.
   upstream in whichever skill owns that axis.
 - **The generated directory is disposable.** Treat `ux/` as build output. Never store
   anything there that is not reproducible from `.amplifier/revisioner/`.
-- **Blocked is not failed.** The UI must keep them visually distinct. A blocked spike
-  means unknown, and collapsing it into "failed" invents a verdict the evidence does not
-  support.
-- **Missing evidence renders as missing.** When a spike wrote no `findings.md`, show that
-  absence. Filling the gap with a summary generated at render time would put unsourced
-  text where the user expects gathered evidence.
